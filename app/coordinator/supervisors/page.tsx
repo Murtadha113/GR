@@ -1,0 +1,432 @@
+"use client"
+
+import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { Home, FolderKanban, Users, FileText, Archive, Mail, Plus, UserPlus } from "lucide-react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { useEffect, useState } from "react"
+import { collection, getDocs, query, where, addDoc } from "firebase/firestore"
+import { db } from "@/lib/firebase/config"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { toast } from "sonner"
+import { useAuth } from "@/lib/contexts/auth-context"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+
+const sidebarItems = [
+  { title: "لوحة التحكم", href: "/coordinator/dashboard", icon: <Home className="w-5 h-5" /> },
+  { title: "جميع المشاريع", href: "/coordinator/projects", icon: <FolderKanban className="w-5 h-5" /> },
+  { title: "المشرفين", href: "/coordinator/supervisors", icon: <Users className="w-5 h-5" /> },
+  { title: "التقارير", href: "/coordinator/reports", icon: <FileText className="w-5 h-5" /> },
+  { title: "الأرشيف", href: "/coordinator/archive", icon: <Archive className="w-5 h-5" /> },
+]
+
+export default function CoordinatorSupervisors() {
+  const { loading: authLoading } = useAuth()
+  const [supervisors, setSupervisors] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [isDialogOpen, setIsDialogOpen] = useState(false)
+  const [isStudentDialogOpen, setIsStudentDialogOpen] = useState(false)
+  const [newSupervisor, setNewSupervisor] = useState({
+    name: "",
+    email: "",
+    department: "",
+    phone: "",
+  })
+  const [newStudent, setNewStudent] = useState({
+    name: "",
+    email: "",
+    studentId: "",
+    department: "",
+    phone: "",
+  })
+
+  const fetchSupervisors = async () => {
+    try {
+      const supervisorsQuery = query(collection(db, "users"), where("role", "==", "supervisor"))
+      const supervisorsSnapshot = await getDocs(supervisorsQuery)
+      const supervisorsData = await Promise.all(
+        supervisorsSnapshot.docs.map(async (doc) => {
+          const supervisorData = { id: doc.id, ...doc.data() }
+
+          const projectsQuery = query(collection(db, "projects"), where("supervisorId", "==", doc.id))
+          const projectsSnapshot = await getDocs(projectsQuery)
+
+          return {
+            ...supervisorData,
+            projectsCount: projectsSnapshot.size,
+          }
+        }),
+      )
+      setSupervisors(supervisorsData)
+    } catch (error) {
+      console.error("Error fetching supervisors:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchStudents = async () => {
+    try {
+      const studentsQuery = query(collection(db, "users"), where("role", "==", "student"))
+      const studentsSnapshot = await getDocs(studentsQuery)
+      const studentsData = studentsSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      setStudents(studentsData)
+    } catch (error) {
+      console.error("Error fetching students:", error)
+    }
+  }
+
+  useEffect(() => {
+    fetchSupervisors()
+    fetchStudents()
+  }, [])
+
+  const handleAddSupervisor = async () => {
+    if (!newSupervisor.name || !newSupervisor.email || !newSupervisor.department) {
+      toast.error("يرجى ملء جميع الحقول المطلوبة")
+      return
+    }
+
+    try {
+      await addDoc(collection(db, "users"), {
+        ...newSupervisor,
+        role: "supervisor",
+        createdAt: new Date(),
+      })
+
+      toast.success("تم إضافة المشرف بنجاح")
+      setIsDialogOpen(false)
+      setNewSupervisor({ name: "", email: "", department: "", phone: "" })
+      fetchSupervisors()
+    } catch (error) {
+      console.error("Error adding supervisor:", error)
+      toast.error("حدث خطأ أثناء إضافة المشرف")
+    }
+  }
+
+  const handleAddStudent = async () => {
+    if (!newStudent.name || !newStudent.email || !newStudent.studentId || !newStudent.department) {
+      toast.error("يرجى ملء جميع الحقول المطلوبة")
+      return
+    }
+
+    try {
+      await addDoc(collection(db, "users"), {
+        ...newStudent,
+        role: "student",
+        createdAt: new Date(),
+      })
+
+      toast.success("تم إضافة الطالب بنجاح")
+      setIsStudentDialogOpen(false)
+      setNewStudent({ name: "", email: "", studentId: "", department: "", phone: "" })
+      fetchStudents()
+    } catch (error) {
+      console.error("Error adding student:", error)
+      toast.error("حدث خطأ أثناء إضافة الطالب")
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <DashboardLayout sidebarItems={sidebarItems} requiredRole="coordinator">
+        <div className="p-8">
+          <Card className="rounded-xl">
+            <CardContent className="p-8">
+              <p className="text-center text-muted-foreground">جاري التحميل...</p>
+            </CardContent>
+          </Card>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  return (
+    <DashboardLayout sidebarItems={sidebarItems} requiredRole="coordinator">
+      <div className="p-8 space-y-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">المشرفين والطلاب</h1>
+            <p className="text-muted-foreground mt-2">إدارة المشرفين الأكاديميين والطلاب</p>
+          </div>
+          <div className="flex gap-2">
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="rounded-lg">
+                  <Plus className="w-4 h-4 ml-2" />
+                  إضافة مشرف
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-xl">
+                <DialogHeader>
+                  <DialogTitle>إضافة مشرف جديد</DialogTitle>
+                  <DialogDescription>أدخل بيانات المشرف الأكاديمي</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">الاسم الكامل *</Label>
+                    <Input
+                      id="name"
+                      value={newSupervisor.name}
+                      onChange={(e) => setNewSupervisor({ ...newSupervisor, name: e.target.value })}
+                      placeholder="د. أحمد محمد"
+                      className="rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">البريد الإلكتروني *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={newSupervisor.email}
+                      onChange={(e) => setNewSupervisor({ ...newSupervisor, email: e.target.value })}
+                      placeholder="supervisor@university.edu"
+                      className="rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="department">القسم *</Label>
+                    <Select
+                      value={newSupervisor.department}
+                      onValueChange={(value) => setNewSupervisor({ ...newSupervisor, department: value })}
+                    >
+                      <SelectTrigger className="rounded-lg">
+                        <SelectValue placeholder="اختر القسم" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-lg">
+                        <SelectItem value="cs">علوم الحاسب</SelectItem>
+                        <SelectItem value="it">تقنية المعلومات</SelectItem>
+                        <SelectItem value="is">نظم المعلومات</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">رقم الهاتف</Label>
+                    <Input
+                      id="phone"
+                      value={newSupervisor.phone}
+                      onChange={(e) => setNewSupervisor({ ...newSupervisor, phone: e.target.value })}
+                      placeholder="+973 XXXX XXXX"
+                      className="rounded-lg"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsDialogOpen(false)} className="rounded-lg">
+                    إلغاء
+                  </Button>
+                  <Button onClick={handleAddSupervisor} className="rounded-lg">
+                    إضافة
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isStudentDialogOpen} onOpenChange={setIsStudentDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="rounded-lg bg-transparent">
+                  <UserPlus className="w-4 h-4 ml-2" />
+                  إضافة طالب
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="rounded-xl">
+                <DialogHeader>
+                  <DialogTitle>إضافة طالب جديد</DialogTitle>
+                  <DialogDescription>أدخل بيانات الطالب</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="studentName">الاسم الكامل *</Label>
+                    <Input
+                      id="studentName"
+                      value={newStudent.name}
+                      onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                      placeholder="محمد أحمد"
+                      className="rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="studentEmail">البريد الإلكتروني *</Label>
+                    <Input
+                      id="studentEmail"
+                      type="email"
+                      value={newStudent.email}
+                      onChange={(e) => setNewStudent({ ...newStudent, email: e.target.value })}
+                      placeholder="student@university.edu"
+                      className="rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="studentId">الرقم الجامعي *</Label>
+                    <Input
+                      id="studentId"
+                      value={newStudent.studentId}
+                      onChange={(e) => setNewStudent({ ...newStudent, studentId: e.target.value })}
+                      placeholder="202012345"
+                      className="rounded-lg"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="studentDepartment">القسم *</Label>
+                    <Select
+                      value={newStudent.department}
+                      onValueChange={(value) => setNewStudent({ ...newStudent, department: value })}
+                    >
+                      <SelectTrigger className="rounded-lg">
+                        <SelectValue placeholder="اختر القسم" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-lg">
+                        <SelectItem value="cs">علوم الحاسب</SelectItem>
+                        <SelectItem value="it">تقنية المعلومات</SelectItem>
+                        <SelectItem value="is">نظم المعلومات</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="studentPhone">رقم الهاتف</Label>
+                    <Input
+                      id="studentPhone"
+                      value={newStudent.phone}
+                      onChange={(e) => setNewStudent({ ...newStudent, phone: e.target.value })}
+                      placeholder="+973 XXXX XXXX"
+                      className="rounded-lg"
+                    />
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsStudentDialogOpen(false)} className="rounded-lg">
+                    إلغاء
+                  </Button>
+                  <Button onClick={handleAddStudent} className="rounded-lg">
+                    إضافة
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        <Tabs defaultValue="supervisors" className="space-y-6">
+          <TabsList className="rounded-lg">
+            <TabsTrigger value="supervisors" className="rounded-lg">
+              المشرفين ({supervisors.length})
+            </TabsTrigger>
+            <TabsTrigger value="students" className="rounded-lg">
+              الطلاب ({students.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="supervisors">
+            {loading ? (
+              <Card className="rounded-xl">
+                <CardContent className="p-8">
+                  <p className="text-center text-muted-foreground">جاري التحميل...</p>
+                </CardContent>
+              </Card>
+            ) : supervisors.length === 0 ? (
+              <Card className="rounded-xl">
+                <CardContent className="p-8">
+                  <div className="text-center space-y-4">
+                    <Users className="w-16 h-16 mx-auto text-muted-foreground" />
+                    <div>
+                      <h3 className="text-lg font-semibold">لا يوجد مشرفين حالياً</h3>
+                      <p className="text-sm text-muted-foreground mt-2">ابدأ بإضافة مشرفين جدد</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {supervisors.map((supervisor) => (
+                  <Card key={supervisor.id} className="rounded-xl">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle>{supervisor.name}</CardTitle>
+                          <CardDescription className="mt-1">{supervisor.department}</CardDescription>
+                        </div>
+                        <Badge className="rounded-lg">{supervisor.projectsCount} مشروع</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground truncate">{supervisor.email}</span>
+                      </div>
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">عدد المشاريع: </span>
+                        <span className="font-medium">{supervisor.projectsCount}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="students">
+            {loading ? (
+              <Card className="rounded-xl">
+                <CardContent className="p-8">
+                  <p className="text-center text-muted-foreground">جاري التحميل...</p>
+                </CardContent>
+              </Card>
+            ) : students.length === 0 ? (
+              <Card className="rounded-xl">
+                <CardContent className="p-8">
+                  <div className="text-center space-y-4">
+                    <Users className="w-16 h-16 mx-auto text-muted-foreground" />
+                    <div>
+                      <h3 className="text-lg font-semibold">لا يوجد طلاب حالياً</h3>
+                      <p className="text-sm text-muted-foreground mt-2">ابدأ بإضافة طلاب جدد</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {students.map((student) => (
+                  <Card key={student.id} className="rounded-xl">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <CardTitle>{student.name}</CardTitle>
+                          <CardDescription className="mt-1">{student.studentId}</CardDescription>
+                        </div>
+                        <Badge variant="secondary" className="rounded-lg">
+                          {student.department === "cs"
+                            ? "علوم الحاسب"
+                            : student.department === "it"
+                              ? "تقنية المعلومات"
+                              : "نظم المعلومات"}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-muted-foreground truncate">{student.email}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+      </div>
+    </DashboardLayout>
+  )
+}
