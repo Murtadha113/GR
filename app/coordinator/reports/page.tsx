@@ -1,22 +1,17 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
-import { Home, FolderKanban, Users, FileText, Archive, Download } from "lucide-react"
+import { coordinatorSidebarItems } from "@/lib/constants/coordinator-sidebar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { useEffect, useState } from "react"
 import { collection, getDocs, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
-
-const sidebarItems = [
-  { title: "لوحة التحكم", href: "/coordinator/dashboard", icon: <Home className="w-5 h-5" /> },
-  { title: "جميع المشاريع", href: "/coordinator/projects", icon: <FolderKanban className="w-5 h-5" /> },
-  { title: "المشرفين", href: "/coordinator/supervisors", icon: <Users className="w-5 h-5" /> },
-  { title: "التقارير", href: "/coordinator/reports", icon: <FileText className="w-5 h-5" /> },
-  { title: "الأرشيف", href: "/coordinator/archive", icon: <Archive className="w-5 h-5" /> },
-]
+import { Download, Archive } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export default function CoordinatorReports() {
+  const router = useRouter()
   const [stats, setStats] = useState({
     totalProjects: 0,
     activeProjects: 0,
@@ -86,17 +81,23 @@ export default function CoordinatorReports() {
   }
 
   return (
-    <DashboardLayout sidebarItems={sidebarItems} requiredRole="coordinator">
+    <DashboardLayout sidebarItems={coordinatorSidebarItems} requiredRole="coordinator">
       <div className="p-8 space-y-8">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">التقارير</h1>
             <p className="text-muted-foreground mt-2">إحصائيات وتقارير الأداء</p>
           </div>
-          <Button onClick={generateReport}>
-            <Download className="w-4 h-4 ml-2" />
-            تحميل التقرير
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={() => router.push("/coordinator/archive")}>
+              <Archive className="w-4 h-4 ml-2" />
+              الأرشيف
+            </Button>
+            <Button onClick={generateReport}>
+              <Download className="w-4 h-4 ml-2" />
+              تحميل التقرير
+            </Button>
+          </div>
         </div>
 
         {loading ? (

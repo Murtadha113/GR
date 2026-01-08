@@ -1,6 +1,7 @@
 "use client"
 
 import { DashboardLayout } from "@/components/layout/dashboard-layout"
+import { coordinatorSidebarItems } from "@/lib/constants/coordinator-sidebar"
 import { FolderKanban } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -8,15 +9,6 @@ import { useEffect, useState } from "react"
 import { collection, getDocs } from "firebase/firestore"
 import { db } from "@/lib/firebase/config"
 import { Progress } from "@/components/ui/progress"
-
-const sidebarItems = [
-  { title: "لوحة التحكم", href: "/coordinator/dashboard" },
-  { title: "جميع المشاريع", href: "/coordinator/projects" },
-  { title: "المشرفين", href: "/coordinator/supervisors" },
-  { title: "الطلاب", href: "/coordinator/students" },
-  { title: "الإعلانات", href: "/coordinator/announcements" },
-  { title: "التقارير", href: "/coordinator/reports" },
-]
 
 export default function CoordinatorArchive() {
   const [projects, setProjects] = useState<any[]>([])
@@ -65,7 +57,9 @@ export default function CoordinatorArchive() {
         <div className="grid gap-2 text-sm">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">تاريخ البدء:</span>
-            <span>{project.startDate ? new Date(project.startDate.seconds * 1000).toLocaleDateString("ar-EG") : "غير محدد"}</span>
+            <span>
+              {project.startDate ? new Date(project.startDate.seconds * 1000).toLocaleDateString("ar-EG") : "غير محدد"}
+            </span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">المشرف:</span>
@@ -83,7 +77,7 @@ export default function CoordinatorArchive() {
   )
 
   return (
-    <DashboardLayout sidebarItems={sidebarItems} requiredRole="coordinator">
+    <DashboardLayout sidebarItems={coordinatorSidebarItems} requiredRole="coordinator">
       <div className="p-8 space-y-8">
         <div>
           <h1 className="text-3xl font-bold">الأرشيف</h1>
